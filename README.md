@@ -51,14 +51,45 @@
   - 生成详细分析报告
   - JSON格式结果导出
 
+## 项目结构
+
+```
+script_zyc/
+├── source_code_fetcher.py      # 源代码获取工具
+├── constructor_parameter_tool.py # 构造函数参数分析工具
+├── state_reader_tool.py        # 状态读取工具
+├── code_sanitizer_tool.py      # 代码清理工具
+├── smart_contract_analyzer.py  # 主要分析器接口
+├── config.py                   # 配置管理模块
+├── requirements.txt            # 项目依赖
+├── env_example.txt            # 环境变量配置示例
+├── .env                       # 环境变量配置文件
+└── README.md                  # 项目文档
+```
+
 ## 安装和使用
 
-### 1. 安装依赖
+### 1. 环境配置
 ```bash
+# 创建并激活conda环境
+conda create -n zyc python=3.11
+conda activate zyc
+
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-### 2. 基本使用
+### 2. 配置环境变量
+```bash
+# 复制环境变量示例文件
+cp env_example.txt .env
+
+# 编辑.env文件，填入您的API密钥
+# WEB3_PROVIDER_URL=https://eth-mainnet.alchemyapi.io/v2/YOUR_API_KEY
+# ETHERSCAN_API_KEY=YOUR_ETHERSCAN_API_KEY
+```
+
+### 3. 基本使用
 
 ```python
 import asyncio
@@ -85,7 +116,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### 3. 单独使用各个工具
+### 4. 单独使用各个工具
 
 #### 源代码获取
 ```python

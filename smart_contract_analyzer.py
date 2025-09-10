@@ -7,13 +7,19 @@ Smart Contract Analyzer
 
 import asyncio
 import json
+import time
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
+from pathlib import Path
 
+from config import config, setup_logging, ensure_output_dir
 from source_code_fetcher import SourceCodeFetcher, ContractInfo
 from constructor_parameter_tool import ConstructorParameterTool, DeploymentInfo
 from state_reader_tool import StateReaderTool, StateSnapshot
 from code_sanitizer_tool import CodeSanitizerTool, SanitizedCode
+
+# 设置日志
+logger = setup_logging()
 
 
 @dataclass
@@ -31,72 +37,106 @@ class ComprehensiveAnalysis:
 class SmartContractAnalyzer:
     """智能合约综合分析器"""
     
-    def __init__(self, web3_provider: str, etherscan_api_key: Optional[str] = None):
+    def __init__(self, web3_provider: Optional[str] = None, etherscan_api_key: Optional[str] = None):
         """
         初始化智能合约分析器
         
         Args:
-            web3_provider: Web3提供商URL
-            etherscan_api_key: Etherscan API密钥
+            web3_provider: Web3提供商URL（可选，将从配置文件读取）
+            etherscan_api_key: Etherscan API密钥（可选，将从配置文件读取）
         """
-        self.source_fetcher = SourceCodeFetcher(web3_provider, etherscan_api_key)
-        self.constructor_tool = ConstructorParameterTool(web3_provider, etherscan_api_key)
-        self.state_reader = StateReaderTool(web3_provider, etherscan_api_key)
+        # 使用传入参数或配置文件中的值
+        self.web3_provider = web3_provider or config.web3_provider_url
+        self.etherscan_api_key = etherscan_api_key or config.etherscan_api_key
+        
+        # 验证配置
+        if not self.web3_provider:
+            raise ValueError("Web3 Provider URL 未设置。请在.env文件中设置 WEB3_PROVIDER_URL 或通过参数传入。")
+        
+        # 初始化工具
+        self.source_fetcher = SourceCodeFetcher(self.web3_provider, self.etherscan_api_key)
+        self.constructor_tool = ConstructorParameterTool(self.web3_provider, self.etherscan_api_key)
+        self.state_reader = StateReaderTool(self.web3_provider, self.etherscan_api_key, config.max_workers)
         self.code_sanitizer = CodeSanitizerTool()
+        
+        # 确保输出目录存在
+        self.output_dir = ensure_output_dir()
+        
+        logger.info(f"智能合约分析器初始化完成")
+        logger.info(f"Web3 Provider: {self.web3_provider[:50]}...")
+        logger.info(f"Etherscan API: {'已设置' if self.etherscan_api_key else '未设置'}")
+        logger.info(f"输出目录: {self.output_dir}")
     
     async def comprehensive_analysis(self, contract_address: str, block_number: Optional[int] = None, 
-                                   include_sanitization: bool = True) -> ComprehensiveAnalysis:
+                                   include_sanitization: Optional[bool] = None) -> ComprehensiveAnalysis:
         """
         执行全面的合约分析
         
         Args:
             contract_address: 合约地址
-            block_number: 目标区块号
-            include_sanitization: 是否包含代码清理
+            block_number: 目标区块号（可选，使用配置中的默认值）
+            include_sanitization: 是否包含代码清理（可选，使用配置中的值）
             
         Returns:
             全面分析结果
         """
-        import time
         analysis_timestamp = int(time.time())
         
-        print(f"开始分析合约: {contract_address}")
+        # 使用配置中的默认值
+        if block_number is None and config.default_block != 'latest':
+            try:
+                block_number = int(config.default_block)
+            except ValueError:
+                block_number = None
+        
+        if include_sanitization is None:
+            include_sanitization = True
+        
+        logger.info(f"开始分析合约: {contract_address}")
         
         # 1. 获取合约信息和源代码
-        print("1. 获取合约源代码和代理信息...")
+        logger.info("1. 获取合约源代码和代理信息...")
         contract_info = await self.source_fetcher.fetch_contract_info(contract_address, block_number)
         
+        # 添加请求延迟
+        await asyncio.sleep(config.request_delay)
+        
         # 2. 分析构造函数参数
-        print("2. 分析构造函数参数...")
+        logger.info("2. 分析构造函数参数...")
         deployment_info = None
         try:
             deployment_info = await self.constructor_tool.analyze_constructor_params(contract_address)
         except Exception as e:
-            print(f"构造函数参数分析失败: {e}")
+            logger.warning(f"构造函数参数分析失败: {e}")
+        
+        await asyncio.sleep(config.request_delay)
         
         # 3. 捕获状态快照
-        print("3. 捕获合约状态快照...")
+        logger.info("3. 捕获合约状态快照...")
         state_snapshot = None
         try:
             state_snapshot = await self.state_reader.capture_state_snapshot(contract_address, block_number)
         except Exception as e:
-            print(f"状态快照捕获失败: {e}")
+            logger.warning(f"状态快照捕获失败: {e}")
         
         # 4. 代码清理（如果有源代码）
-        print("4. 执行代码清理...")
+        logger.info("4. 执行代码清理...")
         sanitized_code = None
         if include_sanitization and contract_info.source_code:
             try:
-                sanitized_code = self.code_sanitizer.sanitize_solidity_code(contract_info.source_code)
+                sanitized_code = self.code_sanitizer.sanitize_solidity_code(
+                    contract_info.source_code, 
+                    config.keep_essential_comments
+                )
             except Exception as e:
-                print(f"代码清理失败: {e}")
+                logger.warning(f"代码清理失败: {e}")
         
         # 生成分析摘要
         analysis_summary = self._generate_analysis_summary(
             contract_info, deployment_info, state_snapshot, sanitized_code
         )
         
-        print("分析完成!")
+        logger.info("分析完成!")
         
         return ComprehensiveAnalysis(
             contract_address=contract_address,
@@ -188,19 +228,30 @@ class SmartContractAnalyzer:
         
         return analysis_map
     
-    def export_analysis_to_json(self, analysis: ComprehensiveAnalysis, file_path: str):
+    def export_analysis_to_json(self, analysis: ComprehensiveAnalysis, file_path: Optional[str] = None):
         """
         将分析结果导出为JSON文件
         
         Args:
             analysis: 分析结果
-            file_path: 文件路径
+            file_path: 文件路径（可选，将自动生成）
         """
+        if file_path is None:
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"analysis_{analysis.contract_address}_{timestamp}.json"
+            file_path = self.output_dir / filename
+        
+        # 确保目录存在
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+        
         # 转换为可序列化的字典
         data = asdict(analysis)
         
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+        
+        logger.info(f"分析结果已导出到: {file_path}")
+        return file_path
     
     def generate_analysis_report(self, analysis: ComprehensiveAnalysis) -> str:
         """
@@ -306,44 +357,62 @@ class SmartContractAnalyzer:
 # 使用示例
 async def main():
     """使用示例"""
-    # 初始化分析器
-    analyzer = SmartContractAnalyzer(
-        web3_provider="https://eth-mainnet.alchemyapi.io/v2/YOUR_API_KEY",
-        etherscan_api_key="YOUR_ETHERSCAN_API_KEY"
-    )
+    # 打印配置信息
+    print("🔧 当前配置:")
+    config.print_config_summary()
     
-    # 单个合约分析
-    contract_address = "0xA0b86a33E6441E09e5fDE7f80b0138b43A5A9b27"
+    # 验证配置
+    validation = config.validate_config()
+    if not validation['valid']:
+        print("❌ 配置验证失败:")
+        for error in validation['errors']:
+            print(f"   - {error}")
+        return
     
-    print("执行全面分析...")
-    analysis = await analyzer.comprehensive_analysis(contract_address)
-    
-    # 生成报告
-    report = analyzer.generate_analysis_report(analysis)
-    print(report)
-    
-    # 导出结果
-    analyzer.export_analysis_to_json(analysis, f"analysis_{contract_address}.json")
-    
-    # 批量分析示例
-    print("\n执行批量分析...")
-    contracts = [
-        "0xA0b86a33E6441E09e5fDE7f80b0138b43A5A9b27",
-        "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
-    ]
-    
-    batch_results = await analyzer.batch_analyze_contracts(contracts)
-    print(f"批量分析完成，成功分析 {len(batch_results)} 个合约")
-    
-    # 状态比较示例
-    print("\n执行状态比较...")
-    comparison = await analyzer.compare_contract_states(
-        contract_address, 
-        18500000,  # 较早的区块
-        18600000   # 较晚的区块
-    )
-    
-    print(f"状态变化数量: {len(comparison['changes'])}")
+    try:
+        # 初始化分析器（使用.env文件中的配置）
+        analyzer = SmartContractAnalyzer()
+        
+        # 单个合约分析
+        contract_address = "0xA0b86a33E6441E09e5fDE7f80b0138b43A5A9b27"
+        
+        print("🚀 执行全面分析...")
+        analysis = await analyzer.comprehensive_analysis(contract_address)
+        
+        # 生成报告
+        report = analyzer.generate_analysis_report(analysis)
+        print(report)
+        
+        # 导出结果（自动生成文件名）
+        exported_file = analyzer.export_analysis_to_json(analysis)
+        print(f"✅ 结果已导出到: {exported_file}")
+        
+        # 批量分析示例
+        print("\n🔄 执行批量分析...")
+        contracts = [
+            "0xA0b86a33E6441E09e5fDE7f80b0138b43A5A9b27",
+            "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
+        ]
+        
+        batch_results = await analyzer.batch_analyze_contracts(contracts)
+        print(f"✅ 批量分析完成，成功分析 {len(batch_results)} 个合约")
+        
+        # 状态比较示例
+        print("\n📊 执行状态比较...")
+        comparison = await analyzer.compare_contract_states(
+            contract_address, 
+            18500000,  # 较早的区块
+            18600000   # 较晚的区块
+        )
+        
+        print(f"✅ 状态变化数量: {len(comparison['changes'])}")
+        
+    except ValueError as e:
+        print(f"❌ 配置错误: {e}")
+        print("💡 请检查.env文件或参考env_example.txt")
+    except Exception as e:
+        logger.error(f"分析过程中出错: {e}")
+        print(f"❌ 分析失败: {e}")
 
 
 if __name__ == "__main__":
