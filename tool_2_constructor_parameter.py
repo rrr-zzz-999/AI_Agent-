@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 from dataclasses import dataclass
 from web3 import Web3
 from eth_utils import to_checksum_address, decode_hex
-from eth_abi import decode_abi
+from eth_abi import decode as decode_abi
 import requests
 
 
@@ -42,17 +42,18 @@ class DeploymentInfo:
 class ConstructorParameterTool:
     """构造函数参数分析工具"""
     
-    def __init__(self, web3_provider: str, etherscan_api_key: Optional[str] = None):
+    def __init__(self, web3_provider: str, etherscan_api_key: Optional[str] = None, etherscan_base_url: Optional[str] = None):
         """
         初始化构造函数参数工具
         
         Args:
             web3_provider: Web3提供商URL
             etherscan_api_key: Etherscan API密钥
+            etherscan_base_url: Etherscan API基础URL
         """
         self.w3 = Web3(Web3.HTTPProvider(web3_provider))
         self.etherscan_api_key = etherscan_api_key
-        self.etherscan_base_url = "https://api.etherscan.io/api"
+        self.etherscan_base_url = etherscan_base_url or "https://api.etherscan.io/api"
     
     async def analyze_constructor_params(self, contract_address: str) -> DeploymentInfo:
         """

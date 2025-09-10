@@ -51,7 +51,7 @@ class BatchCallResult:
 class StateReaderTool:
     """状态读取工具"""
     
-    def __init__(self, web3_provider: str, etherscan_api_key: Optional[str] = None, max_workers: int = 10):
+    def __init__(self, web3_provider: str, etherscan_api_key: Optional[str] = None, max_workers: int = 10, etherscan_base_url: Optional[str] = None):
         """
         初始化状态读取工具
         
@@ -59,10 +59,11 @@ class StateReaderTool:
             web3_provider: Web3提供商URL
             etherscan_api_key: Etherscan API密钥
             max_workers: 最大并发工作线程数
+            etherscan_base_url: Etherscan API基础URL
         """
         self.w3 = Web3(Web3.HTTPProvider(web3_provider))
         self.etherscan_api_key = etherscan_api_key
-        self.etherscan_base_url = "https://api.etherscan.io/api"
+        self.etherscan_base_url = etherscan_base_url or "https://api.etherscan.io/api"
         self.max_workers = max_workers
     
     async def capture_state_snapshot(self, contract_address: str, block_number: Optional[int] = None) -> StateSnapshot:

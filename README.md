@@ -55,17 +55,72 @@
 
 ```
 script_zyc/
-├── source_code_fetcher.py      # 源代码获取工具
-├── constructor_parameter_tool.py # 构造函数参数分析工具
-├── state_reader_tool.py        # 状态读取工具
-├── code_sanitizer_tool.py      # 代码清理工具
-├── smart_contract_analyzer.py  # 主要分析器接口
-├── config.py                   # 配置管理模块
-├── requirements.txt            # 项目依赖
-├── env_example.txt            # 环境变量配置示例
-├── .env                       # 环境变量配置文件
-└── README.md                  # 项目文档
+├── extract_contract_data.py        # 🌟 主要数据提取脚本
+├── tool_1_source_code_fetcher.py   # 🔧 工具1: 源代码获取工具
+├── tool_2_constructor_parameter.py # 🔧 工具2: 构造函数参数分析工具
+├── tool_3_state_reader.py          # 🔧 工具3: 状态读取工具
+├── tool_4_code_sanitizer.py        # 🔧 工具4: 代码清理工具
+├── smart_contract_analyzer.py      # 📊 分析器核心引擎
+├── config.py                       # ⚙️ 配置管理模块
+├── requirements.txt                # 📦 项目依赖
+├── .env                           # 🔐 环境变量配置文件
+├── .gitignore                     # 🚫 Git忽略文件
+└── README.md                      # 📖 项目文档
 ```
+
+## 文件详细说明
+
+### 🌟 主要脚本
+- **`extract_contract_data.py`** - 统一的数据提取入口脚本
+  - 支持多链（ETH、BSC、Polygon、Arbitrum）
+  - 命令行接口：`python extract_contract_data.py <contract_address> <chain_name>`
+  - 输出结构化JSON格式的完整分析结果
+
+### 🔧 A1四工具架构
+
+#### 工具1：`tool_1_source_code_fetcher.py`
+**功能**：源代码获取和代理关系解析
+- 通过字节码模式分析检测代理合约关系
+- 支持EIP-1967、EIP-1822、OpenZeppelin等代理标准
+- 实现槽检查确保访问实际可执行逻辑
+- 维持时间一致性的历史区块查询
+
+#### 工具2：`tool_2_constructor_parameter.py`
+**功能**：构造函数参数重构分析
+- 分析部署交易calldata重构初始化参数
+- 提供配置上下文（代币地址、费用规格、访问控制参数）
+- 智能解码各种参数类型
+- 生成人类可读的参数值格式
+
+#### 工具3：`tool_3_state_reader.py`
+**功能**：合约状态快照捕获
+- ABI分析识别所有公共和外部view函数
+- 批量并发调用在目标区块捕获状态快照
+- 支持历史区块状态查询和对比
+- 自动处理函数签名和参数类型
+
+#### 工具4：`tool_4_code_sanitizer.py`
+**功能**：代码清理和优化
+- 消除非必要元素（注释、未使用代码、无关库依赖）
+- 智能保留重要注释（NatSpec、许可证等）
+- 专注分析可执行逻辑，避免误导性文档
+- 生成优化统计和影响分析
+
+### 📊 核心组件
+- **`smart_contract_analyzer.py`** - 分析器核心引擎
+  - 整合四个工具的主要接口
+  - 提供一键式全面分析功能
+  - 支持批量分析和结果导出
+  - 生成详细的分析报告
+
+### ⚙️ 配置和工具
+- **`config.py`** - 配置管理模块
+  - 环境变量加载和验证
+  - 多链网络配置支持
+  - 类型转换和默认值处理
+- **`requirements.txt`** - Python依赖包列表
+- **`.env`** - 环境变量配置（API密钥、RPC端点等）
+- **`.gitignore`** - Git版本控制忽略规则
 
 ## 安装和使用
 
@@ -116,35 +171,63 @@ async def main():
 asyncio.run(main())
 ```
 
-### 4. 单独使用各个工具
+### 4. 使用主要数据提取脚本
 
-#### 源代码获取
+#### 命令行使用
+```bash
+# 基本用法
+python extract_contract_data.py <contract_address> <chain_name>
+
+# 示例：分析BSC合约
+python extract_contract_data.py 0xdDc0CFF76bcC0ee14c3e73aF630C029fe020F907 bsc
+
+# 示例：分析以太坊合约
+python extract_contract_data.py 0xA0b86a33E6441E09e5fDE7f80b0138b43A5A9b27 eth
+
+# 支持的链
+# eth - 以太坊主网
+# bsc - 币安智能链
+# polygon - Polygon网络
+# arbitrum - Arbitrum网络
+```
+
+#### 输出结果
+脚本会生成包含以下信息的JSON文件：
+- 🔗 代理合约关系分析
+- 🏗️ 构造函数参数重构
+- 📸 合约状态快照
+- 🧹 代码清理优化
+- 📊 完整分析摘要
+
+### 5. 单独使用各个工具
+
+#### 工具1：源代码获取
 ```python
-from source_code_fetcher import SourceCodeFetcher
+from tool_1_source_code_fetcher import SourceCodeFetcher
 
 fetcher = SourceCodeFetcher(web3_provider, etherscan_api_key)
 contract_info = await fetcher.fetch_contract_info(contract_address)
 ```
 
-#### 构造函数参数分析
+#### 工具2：构造函数参数分析
 ```python
-from constructor_parameter_tool import ConstructorParameterTool
+from tool_2_constructor_parameter import ConstructorParameterTool
 
 tool = ConstructorParameterTool(web3_provider, etherscan_api_key)
 deployment_info = await tool.analyze_constructor_params(contract_address)
 ```
 
-#### 状态读取
+#### 工具3：状态读取
 ```python
-from state_reader_tool import StateReaderTool
+from tool_3_state_reader import StateReaderTool
 
 reader = StateReaderTool(web3_provider, etherscan_api_key)
 snapshot = await reader.capture_state_snapshot(contract_address)
 ```
 
-#### 代码清理
+#### 工具4：代码清理
 ```python
-from code_sanitizer_tool import CodeSanitizerTool
+from tool_4_code_sanitizer import CodeSanitizerTool
 
 sanitizer = CodeSanitizerTool()
 result = sanitizer.sanitize_solidity_code(source_code)

@@ -140,6 +140,16 @@ class Config:
         return self.get('ETHERSCAN_API_KEY')
     
     @property
+    def etherscan_base_url(self) -> str:
+        """Etherscan API基础URL"""
+        return self.get('ETHERSCAN_BASE_URL', 'https://api.etherscan.io/api')
+    
+    @property
+    def target_contract(self) -> Optional[str]:
+        """目标合约地址"""
+        return self.get('TARGET_CONTRACT')
+    
+    @property
     def max_workers(self) -> int:
         """最大工作线程数"""
         return self.get_int('MAX_WORKERS', 10)

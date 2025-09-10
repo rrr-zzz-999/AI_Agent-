@@ -12,9 +12,19 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 from dataclasses import dataclass
 from pathlib import Path
 import ast
-import solcx
-from slither import Slither
-from slither.core.declarations import Contract, Function
+# 可选依赖 - 如果需要高级功能请安装
+try:
+    import solcx
+    HAS_SOLCX = True
+except ImportError:
+    HAS_SOLCX = False
+
+try:
+    from slither import Slither
+    from slither.core.declarations import Contract, Function
+    HAS_SLITHER = True
+except ImportError:
+    HAS_SLITHER = False
 
 
 @dataclass

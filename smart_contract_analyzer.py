@@ -13,10 +13,10 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 
 from config import config, setup_logging, ensure_output_dir
-from source_code_fetcher import SourceCodeFetcher, ContractInfo
-from constructor_parameter_tool import ConstructorParameterTool, DeploymentInfo
-from state_reader_tool import StateReaderTool, StateSnapshot
-from code_sanitizer_tool import CodeSanitizerTool, SanitizedCode
+from tool_1_source_code_fetcher import SourceCodeFetcher, ContractInfo
+from tool_2_constructor_parameter import ConstructorParameterTool, DeploymentInfo
+from tool_3_state_reader import StateReaderTool, StateSnapshot
+from tool_4_code_sanitizer import CodeSanitizerTool, SanitizedCode
 
 # 设置日志
 logger = setup_logging()
@@ -54,9 +54,9 @@ class SmartContractAnalyzer:
             raise ValueError("Web3 Provider URL 未设置。请在.env文件中设置 WEB3_PROVIDER_URL 或通过参数传入。")
         
         # 初始化工具
-        self.source_fetcher = SourceCodeFetcher(self.web3_provider, self.etherscan_api_key)
-        self.constructor_tool = ConstructorParameterTool(self.web3_provider, self.etherscan_api_key)
-        self.state_reader = StateReaderTool(self.web3_provider, self.etherscan_api_key, config.max_workers)
+        self.source_fetcher = SourceCodeFetcher(self.web3_provider, self.etherscan_api_key, config.etherscan_base_url)
+        self.constructor_tool = ConstructorParameterTool(self.web3_provider, self.etherscan_api_key, config.etherscan_base_url)
+        self.state_reader = StateReaderTool(self.web3_provider, self.etherscan_api_key, config.max_workers, config.etherscan_base_url)
         self.code_sanitizer = CodeSanitizerTool()
         
         # 确保输出目录存在
